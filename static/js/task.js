@@ -26,6 +26,11 @@ var instructionPages = [ // add as a list as many pages as you like
 	"instructions/instruct-ready.html"
 ];
 
+var points = 0;
+var game = 1;
+var numGames = 10;
+var feature = 0;
+
 
 /********************
 * HTML manipulation
@@ -45,27 +50,60 @@ var StroopExperiment = function() {
 	var wordon, // time word is presented
 	    listening = false;
 
-	var points = 0;
+	
 
 	// Stimuli 
-	var stims = [
-			["111", "222", "233", "1"],
-			["121", "132", "213", "1"],
-			["122", "221", "333", "1"],
-			["132", "131", "123", "1"],
-			["123", "331", "222", "1"],
-			["222", "111", "333", "1"],
-			["213", "112", "313", "1"],
-			["131", "222", "323", "1"],
-			["333", "132", "223", "1"]
-		];
 
+	var numTrials = 10; // number of trials
+
+	var stims = new Array(numTrials);
+
+	var color = ["1", "2", "3"];
+	var shape = ["1", "2", "3"];
+	var pattern = ["1", "2", "3"];
+
+
+	for (var i = 0; i < numTrials; i++) {
+		stims[i] = new Array();
+		// shuffle the three arrays
+		color = _.shuffle(color);
+		shape = _.shuffle(shape);
+		pattern = _.shuffle(pattern);
+		stims[i][0] = color[0]+shape[0]+pattern[0];
+		stims[i][1] = color[1]+shape[1]+pattern[1];
+		stims[i][2] = color[2]+shape[2]+pattern[2];
+	}
 	_.shuffle(stims);
+
+	// choose feature
+	/* 0 = green
+	   1 = red
+	   2 = yellow
+	   3 = square
+	   4 = circle
+	   5 = triangle
+	   6 = # # # 
+	   7 = • • •
+	   8 = ~ ~ ~
+	*/
+	if (game == 1)
+		feature = Math.floor(Math.random()*9)
+	else {
+		var randfeature = Math.floor(Math.random()*9)
+		// choose a feature (dimension different from the previous feature)
+		while (feature/3 == randfeature/3)
+			randfeature = Math.floor(Math.random()*9)
+		feature = randfeature
+	}
 
 	var next = function() {
 		// end
 		if (stims.length===0) {
-			finish();
+			game+=1;
+			if (game > numGames)
+				finish();
+			else
+				StroopExperiment();
 		}
 		// fixation cross
 		else {
@@ -109,7 +147,9 @@ var StroopExperiment = function() {
 		}
 		if (response.length>0) {
 			listening = false;
-			var hit = response == stim[3];           // whether the participant chose the correct dimension
+			//var hit = response == stim[3];           // whether the participant chose the correct dimension
+			var compare = stim[response-1].charAt(feature/3)
+			var hit = compare == (feature%3)+1
 			var rt = new Date().getTime() - wordon;  // reaction time
 			var gained = 0;
 
@@ -118,8 +158,9 @@ var StroopExperiment = function() {
 			}
 
 			else {
+				var rand = Math.random();
 				if (hit) {
-					var rand = Math.random();
+					
 					// +1 with .75 probability
 					if (rand < 0.75) {
 						points+=1;
@@ -131,17 +172,22 @@ var StroopExperiment = function() {
 					}
 				}
 				else {
-					var rand = Math.random();
-
-					show_shape("blank", "Lose", "blank");
+					// +1 with .25 probability
+					if (rand < 0.75)
+						show_shape("blank", "Lose", "blank");
+					else { 
+						points+=1;
+						gained = 1;
+						show_shape("blank", "Win", "blank");
+					}
 				}
 			}
 
-			psiTurk.recordTrialData({'phase':"TEST",
+			psiTurk.recordTrialData({'phase':game,
                                      'stimuli1':stim[0],
                                      'stimuli2':stim[1],
                                      'stimuli3':stim[2],
-                                     'correct': stim[3],  // stimuli w/ correct feature
+                                     'feature': feature,  // feature
                                      'response':response, // user input
                                      'hit':hit,           // whether correct feature was chosen
                                      'outcome':gained,    // point earned
@@ -159,6 +205,13 @@ var StroopExperiment = function() {
 	
 	var show_shape = function(shape1, shape2, shape3) {
 		remove_shape();
+		// diplay game#
+		d3.select("#points")
+			.append("div")
+			.attr("id","gamenum")
+			.style("text-align","left")
+			.text("Game: "+game)
+
 		// display total points
 		d3.select("#points")
 			.append("div")
@@ -177,6 +230,7 @@ var StroopExperiment = function() {
 
 	var remove_shape = function() {
 		d3.select("#total").remove();
+		d3.select("#gamenum").remove();
 		//d3.select("#win").remove();
 	};
 
